@@ -1,0 +1,119 @@
+(ns clojure-jog.vbo
+  (:import [java.nio IntBuffer FloatBuffer]
+           [java.awt Frame BorderLayout Font]
+           [java.awt.event WindowListener WindowAdapter KeyListener KeyEvent]
+           [javax.media.opengl GLEventListener GL2 GLAutoDrawable GLCapabilities GLProfile]
+           [javax.media.opengl.awt GLCanvas]
+           [javax.media.opengl.glu GLU]
+           [javax.swing JFrame]
+           [java.nio FloatBuffer]))
+
+(defn generate-vbo [gl]
+  (let [id-array (int-array 1)]
+    (.glGenBuffers gl 1 id-array 0)
+    (println (str "generated buffer " (first id-array)))
+    (first id-array)))
+
+(def *buffer-id*)
+
+(def *vertexes*)
+
+(def canvas (doto (GLCanvas. (GLCapabilities. (GLProfile/get GLProfile/GL2)))
+              (.setSize 400 400)
+              (.addGLEventListener (proxy [GLEventListener] []
+
+                                     (reshape  [#^GLAutoDrawable drawable x y w h]
+                                       (println "reshape")
+                                       (let [width (.getWidth drawable)
+                                             height (.getHeight drawable)]
+                                         (doto (.getGL2 (.getGL drawable))
+                                           (.glViewport 0 0 width height )
+                                           (.glMatrixMode GL2/GL_PROJECTION )
+                                           (.glLoadIdentity)
+                                           (.glOrtho 0 width height 0 0 1)
+                                           (.glMatrixMode GL2/GL_MODELVIEW))))
+
+                                     (init  [#^GLAutoDrawable drawable]
+                                       (println "init")
+                                       (let [gl (.getGL2 (.getGL drawable))]
+                                         (.glClearColor gl 0.0 0.0 0.0 1.0)
+                                         (.glColor3f gl 0.0 1.0 0.0 )
+                                         (.glDisable gl GL2/GL_LIGHTING)
+                                         (.glDisable gl GL2/GL_TEXTURE_2D)
+
+
+                                         (.glEnableClientState gl GL2/GL_VERTEX_ARRAY)
+
+                                         (def *buffer-id* (generate-vbo gl))
+
+                                         (.glBindBuffer gl GL2/GL_ARRAY_BUFFER *buffer-id*)
+                                         (let [width (.getWidth drawable)
+                                               height (.getHeight drawable)]
+
+                                           (def *vertexes* (float-array [0 0 0
+                                                                         width 0 0
+                                                                         (/ width 2)  height 0]))
+                                           (.glBufferData gl
+                                                          GL2/GL_ARRAY_BUFFER
+                                                          (alength *vertexes*)
+                                                          (FloatBuffer/wrap *vertexes*)
+                                                          GL2/GL_STATIC_DRAW))))
+
+
+                                     (dispose [#^GLAutoDrawable drawable]
+                                       (println "Dispose")
+                                       (.glDeleteBuffers (.getGL2 (.getGL drawable))
+                                                         1
+                                                         (int-array *buffer-id*)
+                                                         0))
+
+                                     (display  [#^GLAutoDrawable drawable]
+
+                                       (let [width (.getWidth drawable)
+                                             height (.getHeight drawable)]
+                                         (println (str "display " width " " height " buffer id: " *buffer-id*))
+                                         (doto (.getGL2 (.getGL drawable))
+                                           (.glClear GL2/GL_COLOR_BUFFER_BIT)
+                                           (.glLoadIdentity)
+
+                                           ;; (.glColor3f 0.0 1.0 0.0)
+                                           ;; (.glBegin GL2/GL_TRIANGLES)
+                                           ;; (.glVertex3f (aget *vertexes* 0)
+                                           ;;              (aget *vertexes* 1)
+                                           ;;              (aget *vertexes* 2))
+                                           ;; (.glVertex3f (aget *vertexes* 3)
+                                           ;;              (aget *vertexes* 4)
+                                           ;;              (aget *vertexes* 5))
+                                           ;; (.glVertex3f (aget *vertexes* 6)
+                                           ;;              (aget *vertexes* 7)
+                                           ;;              (aget *vertexes* 8))
+
+                                           ;; (.glEnd)
+
+                                           (.glColor3f 1.0 0.0 0.0)
+                                           ;;(.glEnableClientState GL2/GL_VERTEX_ARRAY)
+
+                                           (.glBindBuffer GL2/GL_ARRAY_BUFFER *buffer-id*)
+
+                                           (.glVertexPointer 3 GL2/GL_FLOAT 0 (long 0))
+                                           (.glDrawArrays GL2/GL_TRIANGLES 0 9)
+
+                                           (.glFlush)
+
+                                           ;;(.glBindBuffer GL2/GL_ARRAY_BUFFER 0)
+                                           ;;(.glDisableClientState GL2/GL_VERTEX_ARRAY)
+
+
+                                           )))))))
+
+
+(def frame (new JFrame "VBO test"))
+
+(.add (.getContentPane frame)
+      canvas BorderLayout/CENTER)
+
+(doto frame
+  (.setSize 400 400)
+  (.addWindowListener (proxy [WindowAdapter] []
+                        (windowClosing [e] (.dispose frame))))
+  (.setVisible true))
